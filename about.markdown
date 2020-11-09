@@ -4,12 +4,12 @@ title: About
 permalink: /about/
 ---
 
-Hello, I am Tudor Andrei Dumitracu.
+Hello, I am Tudor Andrei Dumitrascu.
 
 This is my blog.
 
-you can find me here:
+You can find me here:
 
-Twitter: https://twitter.com/tudorandre1
-GitHub: https://github.com/TudorAndrei
-LinkedIn: https://www.linkedin.com/in/dumitrascutudor/
+[Twitter]https://twitter.com/tudorandre1
+[GitHub]https://github.com/TudorAndrei
+[LinkedIn]https://www.linkedin.com/in/dumitrascutudor/
