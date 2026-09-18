@@ -4,6 +4,7 @@ set -euo pipefail
 REPO_URL="${DOTFILES_REPO:-https://github.com/TudorAndrei/dotfiles.git}"
 SSH_URL="${DOTFILES_SSH_REPO:-git@github.com:TudorAndrei/dotfiles.git}"
 DOTFILES_DIR="${DOTFILES_DIR:-$HOME/dotfiles}"
+SSH_KEY="${DOTFILES_SSH_KEY:-$HOME/.ssh/github}"
 SKIP_AUTH="${DOTFILES_SKIP_AUTH:-0}"
 
 log() { printf '\033[1;34m==>\033[0m %s\n' "$*"; }
@@ -59,6 +60,34 @@ gh_cmd() {
     return 1
 }
 
+ensure_ssh_config() {
+    local cfg="$HOME/.ssh/config"
+    mkdir -p "$HOME/.ssh"
+    chmod 700 "$HOME/.ssh"
+    [ -f "$cfg" ] || { touch "$cfg" && chmod 600 "$cfg"; }
+    if grep -qiE '^[[:space:]]*Host[[:space:]]+([^#]*[[:space:]])?github\.com([[:space:]]|$)' "$cfg"; then
+        return 0
+    fi
+    log "Adding the github.com entry to ~/.ssh/config..."
+    {
+        printf '\nHost github.com\n'
+        printf '    HostName github.com\n'
+        printf '    AddKeysToAgent yes\n'
+        printf '    User git\n'
+        printf '    PreferredAuthentications publickey\n'
+        if [ "$(uname -s)" = "Darwin" ]; then
+            printf '    UseKeychain yes\n'
+        fi
+        printf '    IdentityFile %s\n' "$SSH_KEY"
+    } >>"$cfg"
+}
+
+ensure_ssh_key() {
+    [ -f "$SSH_KEY" ] && return 0
+    log "Making an SSH key at $SSH_KEY..."
+    ssh-keygen -t ed25519 -f "$SSH_KEY" -N "" -C "$(id -un)@$(hostname -s 2>/dev/null || hostname)"
+}
+
 github_ssh_works() {
     command -v ssh >/dev/null 2>&1 || return 1
     ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new -T git@github.com 2>&1 |
@@ -78,8 +107,12 @@ github_login() {
         warn "gh is not available; install it and run 'gh auth login' to use SSH"
         return 1
     }
-    log "Starting the GitHub login (select SSH and let gh upload a key)..."
-    $gh auth login --hostname github.com --git-protocol ssh || return 1
+    ensure_ssh_key
+    log "Starting the GitHub login..."
+    $gh auth login --hostname github.com --git-protocol ssh --scopes admin:public_key || return 1
+    log "Uploading the public key to GitHub..."
+    $gh ssh-key add "$SSH_KEY.pub" --title "$(hostname -s 2>/dev/null || hostname)" ||
+        warn "The key upload failed; add $SSH_KEY.pub manually"
     github_ssh_works
 }
 
@@ -111,6 +144,8 @@ else
     log "Cloning into $DOTFILES_DIR..."
     git clone --recurse-submodules "$REPO_URL" "$DOTFILES_DIR"
 fi
+
+ensure_ssh_config
 
 if github_ssh_works || github_login; then
     use_ssh_remotes
