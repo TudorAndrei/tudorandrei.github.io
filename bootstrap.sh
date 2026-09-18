@@ -11,10 +11,6 @@ log() { printf '\033[1;34m==>\033[0m %s\n' "$*" >&2; }
 warn() { printf '\033[1;33mWARNING:\033[0m %s\n' "$*" >&2; }
 die() { printf '\033[1;31mERROR:\033[0m %s\n' "$*" >&2; exit 1; }
 
-if [ ! -t 0 ] && [ -r /dev/tty ]; then
-    exec </dev/tty
-fi
-
 pkg_install() {
     local apt_pkg="$1" pacman_pkg="$2" dnf_pkg="$3" brew_pkg="$4" sudo=""
     [ "$(id -u)" -eq 0 ] || sudo="sudo"
@@ -111,7 +107,8 @@ github_login() {
         return 1
     fi
     if [ ! -t 0 ]; then
-        warn "No terminal available for the GitHub login; the remotes stay on HTTPS"
+        warn "No terminal for the GitHub login. For an SSH setup use:"
+        warn "  bash -c \"\$(curl -fsSL https://tudorandrei.github.io/bootstrap.sh)\""
         return 1
     fi
     gh="$(gh_cmd)" || {
