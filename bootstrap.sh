@@ -7,8 +7,8 @@ DOTFILES_DIR="${DOTFILES_DIR:-$HOME/dotfiles}"
 SSH_KEY="${DOTFILES_SSH_KEY:-$HOME/.ssh/github}"
 SKIP_AUTH="${DOTFILES_SKIP_AUTH:-0}"
 
-log() { printf '\033[1;34m==>\033[0m %s\n' "$*"; }
-warn() { printf '\033[1;33mWARNING:\033[0m %s\n' "$*"; }
+log() { printf '\033[1;34m==>\033[0m %s\n' "$*" >&2; }
+warn() { printf '\033[1;33mWARNING:\033[0m %s\n' "$*" >&2; }
 die() { printf '\033[1;31mERROR:\033[0m %s\n' "$*" >&2; exit 1; }
 
 if [ ! -t 0 ] && [ -r /dev/tty ]; then
@@ -42,14 +42,25 @@ ensure_git() {
         die "No known package manager. Install git, then start this script again."
 }
 
+ensure_mise() {
+    local mise
+    mise="$(command -v mise || echo "$HOME/.local/bin/mise")"
+    if [ ! -x "$mise" ]; then
+        log "Installing mise..."
+        curl -fsSL https://mise.run | sh >/dev/null 2>&1 || return 1
+        mise="$HOME/.local/bin/mise"
+    fi
+    [ -x "$mise" ] || return 1
+    echo "$mise"
+}
+
 gh_cmd() {
     local mise
     if command -v gh >/dev/null 2>&1; then
         echo "gh"
         return 0
     fi
-    mise="$(command -v mise || echo "$HOME/.local/bin/mise")"
-    if [ -x "$mise" ]; then
+    if mise="$(ensure_mise)"; then
         echo "$mise x gh@latest -- gh"
         return 0
     fi
