@@ -95,6 +95,12 @@ ensure_ssh_key() {
     ssh-keygen -t ed25519 -f "$SSH_KEY" -N "" -C "$(id -un)@$(hostname -s 2>/dev/null || hostname)"
 }
 
+is_headless() {
+    [ "$(uname -s)" = "Darwin" ] && return 1
+    [ -n "${DISPLAY:-}${WAYLAND_DISPLAY:-}" ] && return 1
+    return 0
+}
+
 github_ssh_works() {
     command -v ssh >/dev/null 2>&1 || return 1
     ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new -T git@github.com 2>&1 |
@@ -116,12 +122,23 @@ github_login() {
         return 1
     }
     ensure_ssh_key
+    if is_headless; then
+        export BROWSER=true
+        log "This machine has no browser."
+        log "Open https://github.com/login/device on another machine"
+        log "and give it the code that gh shows below."
+    fi
     log "Starting the GitHub login..."
-    $gh auth login --hostname github.com --git-protocol ssh --scopes admin:public_key || return 1
+    $gh auth login --hostname github.com --git-protocol ssh \
+        --scopes admin:public_key --skip-ssh-key --web || return 1
     log "Uploading the public key to GitHub..."
     $gh ssh-key add "$SSH_KEY.pub" --title "$(hostname -s 2>/dev/null || hostname)" ||
         warn "The key upload failed; add $SSH_KEY.pub manually"
-    github_ssh_works
+    for _ in 1 2 3 4 5; do
+        github_ssh_works && return 0
+        sleep 3
+    done
+    return 1
 }
 
 use_ssh_remotes() {
